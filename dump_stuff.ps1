@@ -14,7 +14,7 @@ $LinuxConfig = @{
     Objdump         = "objdump";
     DataSectionName = ".data.rel.ro";
     MakeLineSpaces1 = ' ' * " 470d00 ".Length;
-    MakeLineSpaces2 = ' ' * " 470d00 ffff488d bda0fbff ".Length;
+    MakeLineSpaces2 = ' ' * " 470d00 ffff488d bda0fbff".Length;
 }
 
 $linux = $true
@@ -36,7 +36,7 @@ $code = & $Config.Objdump -dCS -j .text $ObjFile | Where-Object {
 }
 
 $syms = & $Config.Objdump -tC $ObjFile | Where-Object {
-    $_ -match '(VTT|vtable) for [A-D]'
+    $_ -match '(VTT|vtable|typeinfo) for [A-D]'
 }
 
 $rdata = & $Config.Objdump -s -j $Config.DataSectionName $ObjFile | Select-Object -Skip 4
@@ -58,7 +58,7 @@ function ParseSymWindows($line, $start) {
 }
 
 function ParseSymLinux($line) {
-    if ($line -match '^(?<Address>[0-9a-f]+) .* (?<Section>[.a-z]+) ([0-9a-z]+) (?<Name>.*)$') {
+    if ($line -match '^(?<Address>[0-9a-f]+) .* (?<Section>\.[.a-z]+)\s+([0-9a-z]+)\s+(?<Name>.*)$') {
         $address = [System.Uint64]::Parse($Matches.Address, [System.Globalization.NumberStyles]::HexNumber)
         @{
             Address = [System.Uint64]($address);
@@ -138,45 +138,46 @@ $code | Where-Object { $_ -match '^0' } | ForEach-Object { $f = ParseFunction $_
 $syms | ForEach-Object { ParseSym $_  $rdataStart } | ForEach-Object { $SymbolsByAddress[$_.Address] = $_.Name }
 
 $print = $false
+
 $LabeledRData = $rdata | ForEach-Object {
     $data = ParseData $_;
     if ($null -eq $data.Address) {
         # "bad-line ", $data.Address, $data.V1, $data.V2, $_ -join ", " | Write-Host;
-        continue;
     }
-    $fun1 = $FunctionsByAddress[$data.V1]
-    $sym1 = $SymbolsByAddress[$data.Address]
-    $sym1p = $SymbolsByAddress[$data.V1]
-    if ($null -ne $sym1p) {
-        $sym1p = "-> " + $sym1p
-    }
-    $sym1 ??= $sym1p
-    $fun2 = $FunctionsByAddress[$data.V2]
-    $sym2 = $SymbolsByAddress[$data.Address + 0x08] ?? $SymbolsByAddress[$data.V2]
-    $sym2p = $SymbolsByAddress[$data.V1]
-    if ($null -ne $sym2p) {
-        $sym2p = "-> " + $sym2p
-    }
-    $sym2 ??= $sym1p
-    $line = MakeLine $fun1 $sym1 $fun2 $sym2
-    if ($null -ne $line) {
-        $print = $true;
-        $line
-    }
-    if ($print) {
-        # $_
+    else {
+        $fun1 = $FunctionsByAddress[$data.V1]
+        $sym1 = $SymbolsByAddress[$data.Address]
+        $sym1p = $SymbolsByAddress[$data.V1]
+        if ($null -ne $sym1p) {
+            $sym1p = "-> " + $sym1p
+        }
+        $sym1 ??= $sym1p
+        $fun2 = $FunctionsByAddress[$data.V2]
+        $sym2 = $SymbolsByAddress[$data.Address + 0x08]
+        $sym2p = $SymbolsByAddress[$data.V2]
+        if ($null -ne $sym2p) {
+            $sym2p = "-> " + $sym2p
+        }
+        $sym2 ??= $sym2p
+        $line = MakeLine $fun1 $sym1 $fun2 $sym2
+        if ($null -ne $line) {
+            $print = $true;
+            $line
+        }
+        if ($print) {
+            $_
+        }
     }
 }
 
+"`nCODE`n"
+$code
 
-# "`nCODE`n"
-# $code
+"`nFunctionsByAddress`n"
+$FunctionsByAddress.Keys | ForEach-Object { [String]::Format('{0,-20:x} {1}', $_, $FunctionsByAddress[$_]) }
 
-# "`nFunctionsByAddress`n"
-# $FunctionsByAddress.Keys | ForEach-Object { [String]::Format('{0,-20:x} {1}', $_, $FunctionsByAddress[$_]) }
+"`nSymbolsByAddress`n"
+$SymbolsByAddress.Keys | ForEach-Object { [String]::Format('{0,-20:x} {1}', $_, $SymbolsByAddress[$_]) }
 
-# "`nSymbolsByAddress`n"
-# $SymbolsByAddress.Keys | ForEach-Object { [String]::Format('{0,-20:x} {1}', $_, $SymbolsByAddress[$_]) }
-
-# "`nLabeledRData`n"
-# $LabeledRData
+"`nLabeledRData`n"
+$LabeledRData
