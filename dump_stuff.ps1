@@ -3,21 +3,43 @@ param(
     [string] $ObjFile
 )
 
-$objdump = 'C:\msys64\mingw64\bin\objdump.exe'
+$WindowsConfig = @{
+    Objdump         = 'C:\msys64\mingw64\bin\objdump.exe';
+    DataSectionName = ".rdata";
+    MakeLineSpaces1 = ' ' * " 14001b000 ".Length;
+    MakeLineSpaces2 = ' ' * " 14001b000 7374643a 3a626164".Length;
+}
+
+$LinuxConfig = @{
+    Objdump         = "objdump";
+    DataSectionName = ".data.rel.ro";
+    MakeLineSpaces1 = ' ' * " 470d00 ".Length;
+    MakeLineSpaces2 = ' ' * " 470d00 ffff488d bda0fbff ".Length;
+}
+
+$linux = $true
+
+if ($linux) {
+    $Config = $LinuxConfig
+}
+else {
+    $Config = $WindowsConfig
+}
+
 $print = $false;
 
-$code = & $objdump -dCS -j .text $ObjFile | Where-Object {
+$code = & $Config.Objdump -dCS -j .text $ObjFile | Where-Object {
     if ($_ -match '^0') {
         $print = $_ -cmatch 'Demo|[A-D]::'
     }
     $print
 }
 
-$syms = & $objdump -tC $ObjFile | Where-Object {
+$syms = & $Config.Objdump -tC $ObjFile | Where-Object {
     $_ -match '(VTT|vtable) for [A-D]'
 }
 
-$rdata = & $objdump -s -j '.rdata' $ObjFile | Select-Object -Skip 4
+$rdata = & $Config.Objdump -s -j $Config.DataSectionName $ObjFile | Select-Object -Skip 4
 
 function ParseSectionStart($section) {
     $line = $section | Where-Object { $_ -match '^\s*\d' } | Select-Object -First 1
@@ -25,13 +47,33 @@ function ParseSectionStart($section) {
     [System.Uint64]::Parse($field, [System.Globalization.NumberStyles]::HexNumber)
 }
 
-function ParseSym($line, $start) {
+function ParseSymWindows($line, $start) {
     if ($line -match '0x(?<Offset>[0-9a-f]+) (?<Name>.*)') {
         $offset = [System.Uint64]::Parse($Matches.Offset, [System.Globalization.NumberStyles]::HexNumber)
         @{
             Address = [System.Uint64]($offset + $start);
             Name    = $Matches.Name;
         }
+    }
+}
+
+function ParseSymLinux($line) {
+    if ($line -match '^(?<Address>[0-9a-f]+) .* (?<Section>[.a-z]+) ([0-9a-z]+) (?<Name>.*)$') {
+        $address = [System.Uint64]::Parse($Matches.Address, [System.Globalization.NumberStyles]::HexNumber)
+        @{
+            Address = [System.Uint64]($address);
+            Name    = $Matches.Name;
+        }
+    }
+}
+
+
+function ParseSym($line, $start) {
+    if ($linux) {
+        ParseSymLinux($line)
+    }
+    else {
+        ParseSymWindows($line, $start)
     }
 }
 
@@ -55,11 +97,11 @@ function ParseData($line) {
         $v1High = ParseUInt32LE $Matches.v1High
         $v2Low = ParseUInt32LE $Matches.v2Low
         $v2High = ParseUInt32LE $Matches.v2High
-        # "Data: ", $address, $v1Low, $v1High, $line | Write-Host
+        # "Data: ", $address, $v1Low, $v1High, $v2Low, $v2High, $line -join ", " | Write-Host
         @{
             Address = [System.UInt64]$address
-            V1 = [System.UInt64]($v1Low + [System.UInt64]$v1High * 0x100000000)
-            V2 = [System.UInt64]($v2Low + [System.UInt64]$v2High * 0x100000000)
+            V1      = [System.UInt64]($v1Low + [System.UInt64]$v1High * 0x100000000)
+            V2      = [System.UInt64]($v2Low + [System.UInt64]$v2High * 0x100000000)
         }
     }
 }
@@ -67,27 +109,25 @@ function ParseData($line) {
 function MakeLine($fun1, $sym1, $fun2, $sym2) {
     $line = $null
     if ($null -ne $fun1) {
-        $line = ' ' * " 14001b000 ".Length + $fun1
-    } elseif ($null -ne $sym1) {
-        $line = ' ' * " 14001b000 ".Length + $sym1
+        $line = $Config.MakeLineSpaces1 + $fun1
+    }
+    elseif ($null -ne $sym1) {
+        $line = $Config.MakeLineSpaces1 + $sym1
     }
     if ($null -ne $fun2) {
         if ($null -eq $line) {
-            $line = ' ' * " 14001b000 7374643a 3a626164".Length
+            $line = $Config.MakeLineSpaces2
         }
         $line += " " + $fun2
-    } elseif ($null -ne $sym2) {
+    }
+    elseif ($null -ne $sym2) {
         if ($null -eq $line) {
-            $line = ' ' * " 14001b000 7374643a 3a626164".Length
+            $line = $Config.MakeLineSpaces2
         }
         $line += " " + $sym2
     }
     $line
 }
-
-# reconcile data...
-
-# $code.Count > .\tmp.dump
 
 $rdataStart = ParseSectionStart $rdata
 
@@ -98,8 +138,12 @@ $code | Where-Object { $_ -match '^0' } | ForEach-Object { $f = ParseFunction $_
 $syms | ForEach-Object { ParseSym $_  $rdataStart } | ForEach-Object { $SymbolsByAddress[$_.Address] = $_.Name }
 
 $print = $false
-$LabeledRData = $rdata | ForEach-Object { 
+$LabeledRData = $rdata | ForEach-Object {
     $data = ParseData $_;
+    if ($null -eq $data.Address) {
+        # "bad-line ", $data.Address, $data.V1, $data.V2, $_ -join ", " | Write-Host;
+        continue;
+    }
     $fun1 = $FunctionsByAddress[$data.V1]
     $sym1 = $SymbolsByAddress[$data.Address]
     $sym1p = $SymbolsByAddress[$data.V1]
@@ -120,23 +164,19 @@ $LabeledRData = $rdata | ForEach-Object {
         $line
     }
     if ($print) {
-        $_
+        # $_
     }
 }
 
 
-"`nCODE`n"
-$code
+# "`nCODE`n"
+# $code
 
-"`nFunctionsByAddress`n"
-$FunctionsByAddress.Keys | ForEach-Object { [String]::Format('{0,-20:x} {1}', $_, $FunctionsByAddress[$_]) }
+# "`nFunctionsByAddress`n"
+# $FunctionsByAddress.Keys | ForEach-Object { [String]::Format('{0,-20:x} {1}', $_, $FunctionsByAddress[$_]) }
 
-# "`nSYMBOLS`n"
-# $syms
-"`nSymbolsByAddress`n"
-$SymbolsByAddress.Keys | ForEach-Object { [String]::Format('{0,-20:x} {1}', $_, $SymbolsByAddress[$_]) }
+# "`nSymbolsByAddress`n"
+# $SymbolsByAddress.Keys | ForEach-Object { [String]::Format('{0,-20:x} {1}', $_, $SymbolsByAddress[$_]) }
 
-"`nLabeledRData`n"
-$LabeledRData
-
-# "CODE", $code, "SYMBOLS", $syms, "RDATA", $rdata > tmp.dump
+# "`nLabeledRData`n"
+# $LabeledRData
