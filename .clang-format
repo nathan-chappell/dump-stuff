@@ -1,0 +1,10 @@
+BasedOnStyle: WebKit
+ColumnLimit: 100
+BinPackParameters: false
+BinPackArguments: false
+BreakBeforeBraces: Custom
+BraceWrapping:
+    AfterStruct: true
+    AfterClass: true
+    AfterControlStatement: false
+    AfterFunction: true
