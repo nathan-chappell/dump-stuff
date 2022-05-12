@@ -1,2 +1,6 @@
-.vscode/
-*.dump
+*.o
+*.exe
+.vscode
+Program
+StaticVTable
+test
