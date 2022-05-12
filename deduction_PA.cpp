@@ -18,8 +18,8 @@ int main(int argc, char **argv) {
 
   t_plain(x);         // A = int,   P = T,  T = int
   t_plain(x_p);       // A = int*,  P = T,  T = int*
-  t_lref_plain(x);   // A = int,   P = T,  T = int
-  t_lref_plain(x_p); // A = int*,  P = T,  T = int*
+  t_lref_plain(x);    // A = int,   P = T,  T = int
+  t_lref_plain(x_p);  // A = int*,  P = T,  T = int*
   // t_pointer(x);    // A = int,   P = T*, deduction fails
   t_pointer(x_p);     // A = int*,  P = T*, T = int
 
