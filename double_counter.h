@@ -46,10 +46,9 @@ enum
     erase_1__check_1_on_right,
 };
 
-#define N 0xff
-#define L 2
-#define R 3
-#define STAY 4
+#define N _NULL
+#define L LEFT
+#define R RIGHT
 
 TRANSITION(INIT, 0, check_input__first_0s, 0, R);
 // TRANSITION(INIT, 0, FAIL, 0, R);
@@ -97,10 +96,9 @@ TRANSITION(erase_1__return_left, 0, erase_1__check_1_on_right, N, R);
 TRANSITION(erase_1__check_1_on_right, N, erase_1__check_1_on_right, N, R);
 TRANSITION(erase_1__check_1_on_right, 0, SUCCESS, N, STAY);
 
-
 #undef L
 #undef R
-#undef STAY
+#undef N
 #undef TRANSITION
 
 #endif
