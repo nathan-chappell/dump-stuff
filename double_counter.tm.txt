@@ -1,0 +1,43 @@
+reads language 0^n 1^m 0^n 1^m : m,n > 0
+
+init:
+check_input-
+    first_0:
+        0 -> first_1, 0, R
+    first_1:
+        0 -> first_1, 0, R
+        1 -> second_0, 1, R
+    second_0:
+        0 -> second_0, 0, R
+        1 -> second_1, 1, R
+    second_1:
+        1 -> second_1, 1, R
+        // we write a 0 to mark the end of the tape
+        n -> init_erase_0, 0, L
+
+init_erase_0:
+    1 -> init_erase_0, 1, L
+    0 -> erase_0-from_right, 0, stay
+
+erase_0-
+    from_right:
+        0 -> from_left, n, L
+    from_left:
+        0 -> from_left, 0, L
+        1 -> from_left, 1, L
+        n -> check_left, n, R
+    check_left:
+        0 -> return_right, n, R
+    return_right:
+        0 -> return_right, 0, R
+        1 -> return_right, 1, R
+        n -> loop_or_break, n, L
+
+    loop_or_break:
+        0 -> from_right, 0, stay
+        1 -> check_for_zero, 1, L
+
+    check_for_zero:
+        1 -> check_for_zero, 1, L
+        n -> init_erase_1, 0, R
+
