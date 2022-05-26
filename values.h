@@ -6,13 +6,20 @@ struct Int {
     static const int value = N;
 };
 
+using Null = Int<0xff>;
 using Zero = Int<0>;
 using One = Int<1>;
-using Null = Int<0xff>;
 
 using Left = Int<2>;
 using Right = Int<3>;
 using Stay = Int<4>;
-using Halt = Int<5>;
+
+#define FAIL 5
+#define SUCCESS 6
+#define INIT 7
+
+using Fail = Int<FAIL>;
+using Success = Int<SUCCESS>;
+using Init = Int<INIT>;
 
 #endif

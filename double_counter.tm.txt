@@ -1,43 +1,75 @@
 reads language 0^n 1^m 0^n 1^m : m,n > 0
 
 init:
+    0 -> check_input-first_0s, 0, R
+    1 -> FAIL
+    n -> FAIL
+
+// make sure that n,m > 0, mark far right side of tape with 0
 check_input-
-    first_0:
-        0 -> first_1, 0, R
-    first_1:
-        0 -> first_1, 0, R
-        1 -> second_0, 1, R
-    second_0:
-        0 -> second_0, 0, R
-        1 -> second_1, 1, R
-    second_1:
-        1 -> second_1, 1, R
+    first_0s:
+        0 -> first_0s, 0, R
+        1 -> first_1s, 1, R
+    first_1s:
+        1 -> first_1s, 1, R
+        0 -> second_0s, 0, R
+    second_0s:
+        0 -> second_0s, 0, R
+        1 -> second_1s, 1, R
+    second_1s:
+        1 -> second_1s, 1, R
         // we write a 0 to mark the end of the tape
         n -> init_erase_0, 0, L
 
+// put head on rightmost 0 of right 0s
 init_erase_0:
     1 -> init_erase_0, 1, L
     0 -> erase_0-from_right, 0, stay
 
+// transform tape from 00011000110 -> 0001100n110 -> n001100n110 -> nnn11nnn110
 erase_0-
     from_right:
         0 -> from_left, n, L
     from_left:
         0 -> from_left, 0, L
         1 -> from_left, 1, L
-        n -> check_left, n, R
+        N -> check_left, N, R
     check_left:
-        0 -> return_right, n, R
+        0 -> return_right, N, R
+    
+    // we stop when we find a null we overwrote a 0 with
     return_right:
         0 -> return_right, 0, R
         1 -> return_right, 1, R
-        n -> loop_or_break, n, L
+        N -> check_0_on_right, N, L
 
-    loop_or_break:
+    check_0_on_right:
         0 -> from_right, 0, stay
-        1 -> check_for_zero, 1, L
+        1 -> check_0_on_left, 1, L
 
-    check_for_zero:
-        1 -> check_for_zero, 1, L
-        n -> init_erase_1, 0, R
+    check_0_on_left:
+        1 -> check_0_on_left, 1, L
+        // we write a 0 to mark the end of the tape
+        N -> init_erase_1, 0, R
 
+// put head on rightmost 1 of left 1s
+init_erase_1:
+    1 -> init_erase_1, 1, R
+    N -> erase_1-from_left, N, L
+
+// transform tape from nn011nnn110 -> nn01nnnn110 -> nn01nnnnn10 -> nn0nnnnnnn0
+erase_1-
+    from_left:
+        1 -> from_right, N, R
+    from_right:
+        N -> from_right, N, R
+        1 -> return_left, N, L
+    return_left:
+        N -> return_left, N, L
+        1 -> from_left, 1, stay
+        0 -> check_1_on_right, N, R
+    
+    check_1_on_right:
+        N -> check_1_on_right, N, R
+        0 -> SUCCESS, N, stay
+    

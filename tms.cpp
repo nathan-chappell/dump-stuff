@@ -4,6 +4,7 @@
 #include "values.h"
 #include "stack.h"
 #include "frame.h"
+#include "double_counter.h"
 
 using namespace std;
 
