@@ -2,20 +2,23 @@
 #define DOUBLE_COUNTER_H
 
 #include "values.h"
+#include "frame.h"
 
 template <typename State, typename Head>
-struct DoubleCounterTransition {
+struct DoubleCounterTM {
     using newState = Fail;
-    using newHead = Head;
+    using newHead = Int<200>;
     using direction = Stay;
+    using frameUpdate = FrameUpdate<newState, newHead, direction>; \
 };
 
 #define TRANSITION(fromState, fromHead, toState, toHead, dir) \
 template <> \
-struct DoubleCounterTransition<Int< fromState >, Int< fromHead >> { \
+struct DoubleCounterTM<Int< fromState >, Int< fromHead >> { \
     using newState = Int< toState >; \
     using newHead = Int< toHead >; \
     using direction = Int< dir >; \
+    using frameUpdate = FrameUpdate<newState, newHead, direction>; \
 };
 
 // states
@@ -49,13 +52,16 @@ enum
 #define STAY 4
 
 TRANSITION(INIT, 0, check_input__first_0s, 0, R);
+// TRANSITION(INIT, 0, FAIL, 0, R);
 
 TRANSITION(check_input__first_0s, 0, check_input__first_0s, 0, R);
+// TRANSITION(check_input__first_0s, 1, FAIL, 1, R);
 TRANSITION(check_input__first_0s, 1, check_input__first_1s, 1, R);
 TRANSITION(check_input__first_1s, 1, check_input__first_1s, 1, R);
 TRANSITION(check_input__first_1s, 0, check_input__second_0s, 0, R);
 
 TRANSITION(check_input__second_0s, 0, check_input__second_0s, 0, R);
+// TRANSITION(check_input__second_0s, 0, FAIL, 0, R);
 TRANSITION(check_input__second_0s, 1, check_input__second_1s, 1, R);
 TRANSITION(check_input__second_1s, 1, check_input__second_1s, 1, R);
 TRANSITION(check_input__second_1s, N, init_erase_0, 0, L);
